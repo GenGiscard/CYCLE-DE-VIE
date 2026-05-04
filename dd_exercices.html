@@ -3520,8 +3520,8 @@ const FEU_ACTIONS = [
   { txt: 'Acheter un t-shirt en coton bio neuf',    zone: 'orange' },
   { txt: 'Acheter un nouveau smartphone chaque année', zone: 'red' },
   { txt: 'Jeter ses piles à la poubelle classique', zone: 'red' },
-  { txt: 'Prendre l&rsquo;avion pour un week-end', zone: 'red' },
-  { txt: 'Laisser couler l&rsquo;eau pendant qu&rsquo;on se brosse les dents', zone: 'red' }
+  { txt: 'Prendre l’avion pour un week-end',   zone: 'red' },
+  { txt: 'Laisser couler l’eau pendant qu’on se brosse les dents', zone: 'red' }
 ];
 
 let feuPlacements = {}; // idx -> zone
@@ -3568,7 +3568,8 @@ function feuRender(shuffled) {
         el.className = 'feu-placed';
         el.dataset.idx = idx;
         el.textContent = a.txt;
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation(); // évite que la zone parente capture aussi le clic
           delete feuPlacements[idx];
           updateFeuStat();
           feuRender();
@@ -3605,11 +3606,14 @@ function updateFeuStat() {
 
 document.getElementById('feuValidate').addEventListener('click', () => {
   let score = 0;
-  document.querySelectorAll('.feu-placed').forEach(el => {
-    const idx = parseInt(el.dataset.idx, 10);
-    const zone = el.parentElement.parentElement.dataset.zone;
-    if (FEU_ACTIONS[idx].zone === zone) { el.classList.add('correct'); score++; }
-    else el.classList.add('wrong');
+  // Lire directement depuis feuPlacements (source de vérité) plutôt que le DOM
+  Object.entries(feuPlacements).forEach(([idx, zone]) => {
+    const i = parseInt(idx, 10);
+    const correct = (FEU_ACTIONS[i].zone === zone);
+    if (correct) score++;
+    // Marquer visuellement la carte concernée
+    const cardEl = document.querySelector('.feu-placed[data-idx="' + i + '"]');
+    if (cardEl) cardEl.classList.add(correct ? 'correct' : 'wrong');
   });
   document.getElementById('feuValidate').disabled = true;
   let msg, emoji;
@@ -3713,9 +3717,17 @@ function renderBattle() {
     '</div>' +
     '<div class="battle-explain" id="battleExplain">' + b.explain + '</div>' +
     '<div class="battle-progress">' + (battleIdx+1) + ' / ' + BATTLES.length + '</div>';
+  let battleAnswered = false; // empêche les double-clics pour un même duel
   arena.querySelectorAll('.battle-fighter').forEach(f => {
     f.addEventListener('click', () => {
-      arena.querySelectorAll('.battle-fighter').forEach(x => x.classList.add('locked'));
+      if (battleAnswered) return; // déjà répondu
+      if (f.classList.contains('locked')) return; // ceinture + bretelles
+      battleAnswered = true;
+      // Verrouille IMMÉDIATEMENT tous les fighters AVANT de toucher au score
+      arena.querySelectorAll('.battle-fighter').forEach(x => {
+        x.classList.add('locked');
+        x.style.pointerEvents = 'none';
+      });
       const side = f.dataset.side;
       const ok = (side === b.winner);
       if (ok) battleScore++;
@@ -3732,6 +3744,8 @@ function renderBattle() {
 
 function finishBattle() {
   const arena = document.getElementById('battleArena');
+  // Filet de sécurité : plafonner le score au max possible
+  battleScore = Math.min(battleScore, BATTLES.length);
   let msg, emoji;
   const pct = battleScore / BATTLES.length * 100;
   if (pct === 100) { emoji='🏆'; msg='Champion incontesté de la battle écolo !'; }
