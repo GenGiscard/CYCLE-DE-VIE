@@ -1354,15 +1354,16 @@
     margin: 12px 0 8px;
   }
 
-  .crossword-clues ol {
-    padding-left: 24px;
+  .crossword-clues ul {
+    list-style: none;
+    padding-left: 0;
     color: var(--text-dim);
     font-size: 13px;
     line-height: 1.6;
   }
 
-  .crossword-clues ol li { margin-bottom: 6px; }
-  .crossword-clues ol li strong { color: var(--leaf); }
+  .crossword-clues ul li { margin-bottom: 6px; }
+  .crossword-clues ul li strong { color: var(--leaf); }
 
   /* ============================================
      EX 12 — MYSTÈRE ÉCOLO
@@ -2473,9 +2474,9 @@
       </div>
       <div class="crossword-clues">
         <h5>↦ HORIZONTAL</h5>
-        <ol id="cwHoriz"></ol>
+        <ul id="cwHoriz"></ul>
         <h5>↧ VERTICAL</h5>
-        <ol id="cwVert"></ol>
+        <ul id="cwVert"></ul>
       </div>
     </div>
     <div class="button-row">
@@ -3857,21 +3858,21 @@ document.getElementById('calcReset').addEventListener('click', startCalc);
 /* Les coordonnées sont [row, col], 0-indexed */
 const CW_WORDS = [
   // horizontaux
-  { word:'RECYCLER',     dir:'h', row:1, col:1, num:1, def:'Transformer un déchet en nouvelle matière première' },
-  { word:'PLANETE',      dir:'h', row:3, col:0, num:3, def:'Notre maison commune' },
-  { word:'COMPOST',      dir:'h', row:5, col:2, num:5, def:'Engrais naturel obtenu à partir des déchets organiques' },
-  { word:'EOLIEN',       dir:'h', row:7, col:0, num:7, def:'Énergie produite par le vent' },
-  { word:'CARBONE',      dir:'h', row:9, col:1, num:9, def:'Élément chimique du CO₂, mesure de l&rsquo;empreinte écologique' },
+  { word:'COMPOST',      dir:'h', row:0,  col:2,  num:1,  def:'Engrais naturel obtenu à partir des déchets organiques' },
+  { word:'RECYCLER',     dir:'h', row:4,  col:1,  num:5,  def:'Transformer un déchet en nouvelle matière première' },
+  { word:'EAU',          dir:'h', row:6,  col:1,  num:6,  def:'Ressource précieuse, qu&rsquo;il faut économiser' },
+  { word:'CARBONE',      dir:'h', row:7,  col:6,  num:8,  def:'Élément chimique du CO₂, mesure de l&rsquo;empreinte écologique' },
+  { word:'PLANETE',      dir:'h', row:8,  col:0,  num:9,  def:'Notre maison commune' },
+  { word:'ENERGIE',      dir:'h', row:11, col:0,  num:10, def:'Ce que consomme tout objet électrique. On la mesure en kWh.' },
   // verticaux
-  { word:'EAU',          dir:'v', row:1, col:5, num:2, def:'Ressource précieuse, qu&rsquo;il faut économiser' },
-  { word:'BAMBOU',       dir:'v', row:3, col:3, num:4, def:'Plante à croissance rapide, utilisée comme alternative au plastique' },
-  { word:'TRI',          dir:'v', row:5, col:7, num:6, def:'Action de séparer les déchets selon leur nature' },
-  { word:'ENERGIE',      dir:'v', row:3, col:9, num:8, def:'Ce que consomme tout objet électrique. On la mesure en kWh.' },
-  { word:'OBSOLESCENCE', dir:'v', row:0, col:6, num:10, def:'« ____ programmée » : raccourcir volontairement la durée de vie d&rsquo;un produit' }
+  { word:'OBSOLESCENCE', dir:'v', row:0,  col:6,  num:2,  def:'« ____ programmée » : raccourcir volontairement la durée de vie d&rsquo;un produit' },
+  { word:'TRI',          dir:'v', row:0,  col:8,  num:3,  def:'Action de séparer les déchets selon leur nature' },
+  { word:'BAMBOU',       dir:'v', row:3,  col:10, num:4,  def:'Plante à croissance rapide, utilisée comme alternative au plastique' },
+  { word:'EOLIEN',       dir:'v', row:6,  col:1,  num:7,  def:'Énergie produite par le vent' }
 ];
 
 let cwGrid = null;
-let cwRows = 12, cwCols = 12;
+let cwRows = 13, cwCols = 14;
 
 function buildCWGrid() {
   // matrice : null = case noire, sinon { letter, inputs: [refs], num? }
@@ -3952,12 +3953,12 @@ function startCW() {
   vert.innerHTML = '';
   CW_WORDS.filter(w => w.dir === 'h').sort((a,b)=>a.num-b.num).forEach(w => {
     const li = document.createElement('li');
-    li.innerHTML = '<strong>' + w.num + '.</strong> ' + w.def + ' <em style="color:var(--text-dim);font-size:11px;">(' + w.word.length + ')</em>';
+    li.innerHTML = '<strong>' + w.num + '.</strong> ' + w.def;
     horiz.appendChild(li);
   });
   CW_WORDS.filter(w => w.dir === 'v').sort((a,b)=>a.num-b.num).forEach(w => {
     const li = document.createElement('li');
-    li.innerHTML = '<strong>' + w.num + '.</strong> ' + w.def + ' <em style="color:var(--text-dim);font-size:11px;">(' + w.word.length + ')</em>';
+    li.innerHTML = '<strong>' + w.num + '.</strong> ' + w.def;
     vert.appendChild(li);
   });
   document.getElementById('cwResult').innerHTML = '';
