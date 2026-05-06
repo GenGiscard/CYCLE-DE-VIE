@@ -2114,6 +2114,9 @@
     border-top: 1px solid var(--border);
   }
 </style>
+<!-- ===== FIREBASE SDK ===== -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -4565,8 +4568,54 @@ document.getElementById('evalReviewBtn').addEventListener('click', () => {
 
 document.getElementById('evalBackToResultBtn').addEventListener('click', () => showScreen('screen-eval-result'));
 
+/* =========================================================
+   FIREBASE — Stockage centralisé des résultats
+   =========================================================
+   Pour activer Firebase :
+   1. Remplace les valeurs ci-dessous par celles de ton projet
+      (console.firebase.google.com → ⚙️ Paramètres → ton app web)
+   2. Si tu réutilises ton projet existant (eval-bloc / sysml),
+      il suffit de copier la même config.
+   3. Le nœud utilisé : "resultats_dd_carnet"
+*/
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBNS96VMNNtGpyZwW8jJCeLkLiWCUIEJTE",
+  authDomain:        "evaluation-bloc.firebaseapp.com",
+  databaseURL:       "https://evaluation-bloc-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "evaluation-bloc",
+  storageBucket:     "evaluation-bloc.firebasestorage.app",
+  messagingSenderId: "578084725010",
+  appId:             "1:578084725010:web:e68196925631ca9cddd3cb"
+};
+const FIREBASE_NODE = 'resultats_dd_carnet';
+
+let _firebaseDB = null;
+let _firebaseEnabled = false;
+try {
+  if (FIREBASE_CONFIG.apiKey !== 'COLLER_ICI' && typeof firebase !== 'undefined') {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _firebaseDB = firebase.database();
+    _firebaseEnabled = true;
+    console.log('✅ Firebase initialisé — résultats centralisés');
+  } else {
+    console.warn('⚠️ Firebase non configuré — fallback localStorage local');
+  }
+} catch(e) {
+  console.error('Erreur init Firebase, fallback localStorage:', e);
+  _firebaseEnabled = false;
+}
+
 /* ===== STORAGE ===== */
 function saveEvalRecord(rec) {
+  if (_firebaseEnabled) {
+    try {
+      _firebaseDB.ref(FIREBASE_NODE).push(rec);
+      return;
+    } catch(e) {
+      console.error('Erreur Firebase save, fallback localStorage:', e);
+    }
+  }
+  // Fallback localStorage
   let arr = [];
   try {
     const raw = localStorage.getItem(EVAL_STORAGE_KEY);
@@ -4577,12 +4626,50 @@ function saveEvalRecord(rec) {
   catch(e) { console.warn('localStorage indisponible'); }
 }
 
-function loadEvalRecords() {
+function loadEvalRecords(callback) {
+  // callback(arr) — version asynchrone à cause de Firebase
+  if (_firebaseEnabled) {
+    try {
+      _firebaseDB.ref(FIREBASE_NODE).once('value', (snapshot) => {
+        const data = snapshot.val();
+        const arr = data ? Object.values(data) : [];
+        callback(arr);
+      }, (err) => {
+        console.error('Erreur Firebase load, fallback localStorage:', err);
+        callback(loadLocalRecords());
+      });
+      return;
+    } catch(e) {
+      console.error('Erreur Firebase, fallback localStorage:', e);
+    }
+  }
+  callback(loadLocalRecords());
+}
+
+function loadLocalRecords() {
   try {
     const raw = localStorage.getItem(EVAL_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch(e) {}
   return [];
+}
+
+function clearEvalRecords(callback) {
+  if (_firebaseEnabled) {
+    try {
+      _firebaseDB.ref(FIREBASE_NODE).remove()
+        .then(() => callback && callback(true))
+        .catch((err) => {
+          console.error('Erreur Firebase clear:', err);
+          callback && callback(false);
+        });
+      return;
+    } catch(e) {
+      console.error('Erreur Firebase clear, fallback localStorage:', e);
+    }
+  }
+  localStorage.removeItem(EVAL_STORAGE_KEY);
+  callback && callback(true);
 }
 
 /* ===== TEACHER ===== */
@@ -4601,61 +4688,75 @@ document.getElementById('evalPwInput').addEventListener('keypress', (e) => {
 });
 
 function renderEvalDashboard() {
-  const records = loadEvalRecords();
   const stats = document.getElementById('evalDashStats');
   const rows = document.getElementById('evalDashRows');
   const empty = document.getElementById('evalDashEmpty');
 
+  // État de chargement
+  stats.innerHTML = '<div class="stat-card"><span class="num">…</span><span class="label">Chargement</span></div>';
   rows.innerHTML = '';
-  if (records.length === 0) {
-    empty.style.display = 'block';
-    stats.innerHTML = '';
-    return;
-  }
   empty.style.display = 'none';
 
-  const total = records.length;
-  const moy = (records.reduce((s,r) => s+r.note, 0) / total).toFixed(1);
-  const minN = Math.min(...records.map(r => r.note));
-  const maxN = Math.max(...records.map(r => r.note));
-  const reussite = (records.filter(r => r.note >= 10).length / total * 100).toFixed(0);
+  loadEvalRecords((records) => {
+    rows.innerHTML = '';
+    if (records.length === 0) {
+      empty.style.display = 'block';
+      stats.innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
 
-  stats.innerHTML =
-    '<div class="stat-card"><span class="num">' + total + '</span><span class="label">Élèves</span></div>' +
-    '<div class="stat-card"><span class="num">' + moy + '</span><span class="label">Moyenne /20</span></div>' +
-    '<div class="stat-card"><span class="num">' + minN + '</span><span class="label">Note mini</span></div>' +
-    '<div class="stat-card"><span class="num">' + maxN + '</span><span class="label">Note maxi</span></div>' +
-    '<div class="stat-card"><span class="num">' + reussite + '%</span><span class="label">≥ 10/20</span></div>';
+    // Trier par date décroissante (plus récent en haut)
+    records.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  records.slice().reverse().forEach(r => {
-    const pct = (r.note / r.max * 100).toFixed(0);
-    let cls = 'grade-bad';
-    if (r.note >= 14) cls = 'grade-good';
-    else if (r.note >= 10) cls = 'grade-mid';
-    const d = new Date(r.date);
-    const dStr = d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-    rows.innerHTML += '<tr>' +
-      '<td>' + dStr + '</td>' +
-      '<td>' + r.prenom + ' ' + r.nom + '</td>' +
-      '<td>' + r.classe + '</td>' +
-      '<td class="grade-cell ' + cls + '">' + r.note + ' / ' + r.max + '</td>' +
-      '<td class="grade-cell ' + cls + '">' + pct + ' %</td>' +
-      '</tr>';
+    const total = records.length;
+    const moy = (records.reduce((s,r) => s+r.note, 0) / total).toFixed(1);
+    const minN = Math.min(...records.map(r => r.note));
+    const maxN = Math.max(...records.map(r => r.note));
+    const reussite = (records.filter(r => r.note >= 10).length / total * 100).toFixed(0);
+
+    const sourceLabel = _firebaseEnabled ? '☁️ Firebase' : '💾 Local';
+    stats.innerHTML =
+      '<div class="stat-card"><span class="num">' + total + '</span><span class="label">Élèves</span></div>' +
+      '<div class="stat-card"><span class="num">' + moy + '</span><span class="label">Moyenne /20</span></div>' +
+      '<div class="stat-card"><span class="num">' + minN + '</span><span class="label">Note mini</span></div>' +
+      '<div class="stat-card"><span class="num">' + maxN + '</span><span class="label">Note maxi</span></div>' +
+      '<div class="stat-card"><span class="num">' + reussite + '%</span><span class="label">≥ 10/20</span></div>' +
+      '<div class="stat-card" style="border-top-color:var(--ocean);"><span class="num" style="font-size:14px;color:var(--ocean);padding-top:6px;display:block;">' + sourceLabel + '</span><span class="label">Source</span></div>';
+
+    records.forEach(r => {
+      const pct = (r.note / r.max * 100).toFixed(0);
+      let cls = 'grade-bad';
+      if (r.note >= 14) cls = 'grade-good';
+      else if (r.note >= 10) cls = 'grade-mid';
+      const d = new Date(r.date);
+      const dStr = d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+      rows.innerHTML += '<tr>' +
+        '<td>' + dStr + '</td>' +
+        '<td>' + r.prenom + ' ' + r.nom + '</td>' +
+        '<td>' + r.classe + '</td>' +
+        '<td class="grade-cell ' + cls + '">' + r.note + ' / ' + r.max + '</td>' +
+        '<td class="grade-cell ' + cls + '">' + pct + ' %</td>' +
+        '</tr>';
+    });
   });
 }
 
 document.getElementById('evalClearBtn').addEventListener('click', () => {
   if (!confirm('Effacer DÉFINITIVEMENT tous les résultats enregistrés ?')) return;
   if (!confirm('Vraiment ? Cette action est irréversible.')) return;
-  localStorage.removeItem(EVAL_STORAGE_KEY);
-  renderEvalDashboard();
+  clearEvalRecords((ok) => {
+    if (ok) renderEvalDashboard();
+    else alert('Erreur lors de l\u2019effacement.');
+  });
 });
 
 document.getElementById('evalExportBtn').addEventListener('click', () => {
-  const records = loadEvalRecords();
-  if (records.length === 0) { alert('Aucun résultat à exporter.'); return; }
-  let csv = 'Date;Prenom;Nom;Classe;Note;Sur;Pourcentage\n';
-  records.forEach(r => {
+  loadEvalRecords((records) => {
+    if (records.length === 0) { alert('Aucun résultat à exporter.'); return; }
+    records.sort((a, b) => new Date(b.date) - new Date(a.date));
+    let csv = 'Date;Prenom;Nom;Classe;Note;Sur;Pourcentage\n';
+    records.forEach(r => {
     const d = new Date(r.date);
     const dStr = d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR');
     const pct = (r.note / r.max * 100).toFixed(1);
@@ -4668,6 +4769,7 @@ document.getElementById('evalExportBtn').addEventListener('click', () => {
   a.download = 'resultats_carnet_dd_' + new Date().toISOString().slice(0,10) + '.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  });
 });
 
 /* init */
