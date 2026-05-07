@@ -1799,6 +1799,95 @@
   .eval-question-card.diff-veryhard-card { border-left: 4px solid var(--coral); }
   .eval-question-card.diff-medium-card { border-left: 4px solid var(--ocean); }
 
+  /* ============ MINI-CALCULATRICE ============ */
+  .calc-layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .calc-layout > .calc-question { flex: 1; min-width: 0; }
+  .calc-layout > .mini-calc { flex: 0 0 240px; position: sticky; top: 20px; }
+
+  @media (max-width: 760px) {
+    .calc-layout { flex-direction: column; }
+    .calc-layout > .mini-calc { flex: 1; width: 100%; max-width: 320px; margin: 0 auto; position: static; }
+  }
+
+  .mini-calc {
+    background: linear-gradient(135deg, #11362a, #143d31);
+    border: 2px solid var(--leaf-deep);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .mini-calc-title {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--leaf-soft);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .calc-screen {
+    background: #06140f;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--leaf);
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    text-align: right;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    white-space: nowrap;
+    min-height: 22px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(74,222,128,0.4);
+  }
+
+  .calc-keys {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .calc-key {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    user-select: none;
+  }
+
+  .calc-key:hover { background: var(--leaf-deep); border-color: var(--leaf); }
+  .calc-key:active { transform: scale(0.95); background: var(--leaf-soft); color: var(--bg-deep); }
+
+  .calc-key.calc-op { color: var(--amber); border-color: rgba(251,191,36,0.3); }
+  .calc-key.calc-op:hover { background: rgba(251,191,36,0.15); }
+
+  .calc-key.calc-clear { color: var(--coral); border-color: rgba(251,113,133,0.3); }
+  .calc-key.calc-clear:hover { background: rgba(251,113,133,0.15); }
+
+  .calc-key.calc-eq {
+    background: linear-gradient(135deg, var(--leaf), var(--leaf-deep));
+    color: var(--bg-deep);
+    border: none;
+    grid-row: span 2;
+  }
+  .calc-key.calc-eq:hover { background: linear-gradient(135deg, var(--leaf-soft), var(--leaf)); }
+
+  .calc-key.calc-zero { grid-column: span 2; }
+
   .eval-options {
     display: flex;
     flex-direction: column;
@@ -4277,7 +4366,7 @@ const EVAL_QUESTIONS = [
   },
   // ============== HARD (2 pts × 4) ==============
   {
-    diff: 'hard', pts: 2, theme: 'Calcul',
+    diff: 'hard', pts: 2, theme: 'Calcul', calc: true,
     text: 'Une école compte 500 élèves. On estime que chaque élève consomme en moyenne 2 t-shirts par an.',
     context: '1 t-shirt en coton = 7 kg CO\u2082 + 2700 L d\u2019eau\n1 arbre absorbe 22 kg CO\u2082 / an',
     q: 'Combien d\u2019arbres faudrait-il planter pour compenser, en 1 an, le CO\u2082 émis par les t-shirts de toute l\u2019école ?',
@@ -4355,6 +4444,90 @@ const EVAL_QUESTIONS = [
 const EVAL_TEACHER_PASSWORD = 'Agostini2025';
 const EVAL_ACCESS_CODE = 'Eval2026';
 const EVAL_STORAGE_KEY = 'dd_carnet_eval_results';
+
+/* ============ MINI-CALCULATRICE pour les questions de calcul ============ */
+function buildMiniCalc() {
+  const calc = document.createElement('div');
+  calc.className = 'mini-calc';
+  calc.innerHTML =
+    '<div class="mini-calc-title">🔢 Calculatrice</div>' +
+    '<div class="calc-screen" id="calcScreen">0</div>' +
+    '<div class="calc-keys">' +
+      '<button class="calc-key calc-clear" data-k="C">AC</button>' +
+      '<button class="calc-key calc-clear" data-k="←">←</button>' +
+      '<button class="calc-key calc-op" data-k="÷">÷</button>' +
+      '<button class="calc-key calc-op" data-k="×">×</button>' +
+      '<button class="calc-key" data-k="7">7</button>' +
+      '<button class="calc-key" data-k="8">8</button>' +
+      '<button class="calc-key" data-k="9">9</button>' +
+      '<button class="calc-key calc-op" data-k="-">−</button>' +
+      '<button class="calc-key" data-k="4">4</button>' +
+      '<button class="calc-key" data-k="5">5</button>' +
+      '<button class="calc-key" data-k="6">6</button>' +
+      '<button class="calc-key calc-op" data-k="+">+</button>' +
+      '<button class="calc-key" data-k="1">1</button>' +
+      '<button class="calc-key" data-k="2">2</button>' +
+      '<button class="calc-key" data-k="3">3</button>' +
+      '<button class="calc-key calc-eq" data-k="=">=</button>' +
+      '<button class="calc-key calc-zero" data-k="0">0</button>' +
+      '<button class="calc-key" data-k=".">.</button>' +
+    '</div>';
+  return calc;
+}
+
+let _calcExpr = '';
+function initMiniCalc() {
+  _calcExpr = '';
+  const screen = document.getElementById('calcScreen');
+  if (!screen) return;
+  screen.textContent = '0';
+  document.querySelectorAll('.calc-key').forEach(b => {
+    b.addEventListener('click', () => handleCalcKey(b.dataset.k));
+  });
+}
+
+function handleCalcKey(k) {
+  const screen = document.getElementById('calcScreen');
+  if (k === 'C') {
+    _calcExpr = '';
+    screen.textContent = '0';
+    return;
+  }
+  if (k === '←') {
+    _calcExpr = _calcExpr.slice(0, -1);
+    screen.textContent = _calcExpr || '0';
+    return;
+  }
+  if (k === '=') {
+    if (!_calcExpr) return;
+    try {
+      // Sécurité : on n'accepte que chiffres, opérateurs et points
+      const safe = _calcExpr.replace(/×/g, '*').replace(/÷/g, '/');
+      if (!/^[\d+\-*/.()\s]+$/.test(safe)) {
+        screen.textContent = 'Erreur';
+        _calcExpr = '';
+        return;
+      }
+      const res = Function('"use strict"; return (' + safe + ')')();
+      const formatted = Number.isInteger(res) ? String(res) : Number(res.toFixed(6)).toString();
+      screen.textContent = formatted;
+      _calcExpr = formatted;
+    } catch(e) {
+      screen.textContent = 'Erreur';
+      _calcExpr = '';
+    }
+    return;
+  }
+  // Empêcher les opérateurs en début (sauf "-")
+  if ('+×÷'.includes(k) && _calcExpr === '') return;
+  // Empêcher deux opérateurs successifs
+  if ('+-×÷'.includes(k) && '+-×÷'.includes(_calcExpr.slice(-1))) {
+    _calcExpr = _calcExpr.slice(0, -1) + k;
+  } else {
+    _calcExpr += k;
+  }
+  screen.textContent = _calcExpr;
+}
 
 let evalState = {
   student: { prenom: '', nom: '', classe: '' },
@@ -4475,7 +4648,20 @@ function renderEvalQuestion() {
   });
   card.appendChild(list);
 
-  cont.appendChild(card);
+  // Layout : si la question demande une calculatrice, on wrappe avec un flex
+  if (q.calc) {
+    const layout = document.createElement('div');
+    layout.className = 'calc-layout';
+    const wrap = document.createElement('div');
+    wrap.className = 'calc-question';
+    wrap.appendChild(card);
+    layout.appendChild(wrap);
+    layout.appendChild(buildMiniCalc());
+    cont.appendChild(layout);
+    initMiniCalc();
+  } else {
+    cont.appendChild(card);
+  }
 
   document.getElementById('evalNext').disabled = true;
   document.getElementById('evalNext').textContent = (idx === EVAL_QUESTIONS.length - 1) ? '✓ Terminer l\u2019épreuve' : 'Question suivante →';
